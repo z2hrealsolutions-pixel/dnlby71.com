@@ -1,30 +1,51 @@
-import React, { useState, useEffect } from 'react'
-import TvView from './pages/TvView.jsx'
-import PhoneView from './pages/PhoneView.jsx'
-import MatchupDetail from './pages/MatchupDetail.jsx'
-
-// A TV browser window is reliably wide (1280px+ even at modest render
-// scales); phones are reliably narrow. This threshold is deliberately
-// generous so a tablet in landscape still gets the richer TV layout.
-function useIsTv() {
-  const [isTv, setIsTv] = useState(window.innerWidth >= 900)
-  useEffect(() => {
-    function onResize() { setIsTv(window.innerWidth >= 900) }
-    window.addEventListener('resize', onResize)
-    return () => window.removeEventListener('resize', onResize)
-  }, [])
-  return isTv
-}
+import React, { useEffect, useState } from 'react'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { supabase } from './supabaseClient'
+import Layout from './components/Layout.jsx'
+import Login from './pages/Login.jsx'
+import Dashboard from './pages/Dashboard.jsx'
+import Import from './pages/Import.jsx'
+import Teams from './pages/Teams.jsx'
+import Schedule from './pages/Schedule.jsx'
+import Lineups from './pages/Lineups.jsx'
+import Standings from './pages/Standings.jsx'
+import Knockout from './pages/Knockout.jsx'
+import Export from './pages/Export.jsx'
 
 export default function App() {
-  const isTv = useIsTv()
-  const [detailMatchupId, setDetailMatchupId] = useState(null)
+  const [session, setSession] = useState(undefined) // undefined = still checking
 
-  if (detailMatchupId) {
-    return <MatchupDetail matchupId={detailMatchupId} onBack={() => setDetailMatchupId(null)} />
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setSession(data.session))
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSession(newSession)
+    })
+    return () => listener.subscription.unsubscribe()
+  }, [])
+
+  if (session === undefined) {
+    return <div className="loading-note">Loading…</div>
   }
 
-  return isTv
-    ? <TvView />
-    : <PhoneView onOpenMatchup={setDetailMatchupId} />
+  if (!session) {
+    return <Login />
+  }
+
+  return (
+    <BrowserRouter>
+      <Layout>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/import" element={<Import />} />
+          <Route path="/teams" element={<Teams />} />
+          <Route path="/schedule" element={<Schedule />} />
+          <Route path="/lineups" element={<Lineups />} />
+          <Route path="/standings" element={<Standings />} />
+          <Route path="/knockout" element={<Knockout />} />
+          <Route path="/export" element={<Export />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Layout>
+    </BrowserRouter>
+  )
 }
